@@ -138,6 +138,8 @@ class JoyTeleopTopicCommand(JoyTeleopCommand):
         self.name = name
 
         self.topic_type = get_interface_type(config['interface_type'], 'msg')
+        self.toggle = False
+        self.toggled_on = False
 
         # A 'message_value' is a fixed message that is sent in response to an activation.  It is
         # mutually exclusive with an 'axis_mapping'.
@@ -180,6 +182,11 @@ class JoyTeleopTopicCommand(JoyTeleopCommand):
             raise JoyTeleopException("Only one of 'message_value' or 'axis_mappings' "
                                      "can be configured for command '{}'".format(name))
 
+        if 'toggle' in config:
+            if not isinstance(config['toggle'], bool):
+                raise JoyTeleopException("toggle parameter type must be boolean (True/False)")
+            self.toggle = config['toggle']
+
         qos = rclpy.qos.QoSProfile(history=rclpy.qos.QoSHistoryPolicy.KEEP_LAST,
                                    depth=1,
                                    reliability=rclpy.qos.QoSReliabilityPolicy.RELIABLE,
@@ -198,12 +205,31 @@ class JoyTeleopTopicCommand(JoyTeleopCommand):
         #     transitioned from 0 -> 1, or it means that this is an axis mapping and data should
         #     continue to be published without debouncing.
 
+
         last_active = self.active
         self.update_active_from_buttons_and_axes(joy_state)
-        if not self.active:
-            return
-        if self.msg_value is not None and last_active == self.active:
-            return
+
+        if 'default' in self.buttons:
+            for cmd in node.commands:
+                if cmd != self and hasattr(cmd, 'toggled_on') and cmd.toggled_on:
+                    return
+
+        ## Toggle mode
+        if self.toggle:
+            if last_active and not self.active:
+                self.toggled_on = not self.toggled_on # ON/OFF
+                node.get_logger().info(f"{self.name}: toggled {'ON' if self.toggled_on else 'OFF'}")
+
+            if not self.toggled_on:
+                return
+        ## Not Toggle
+        else:
+            if not self.active:
+                # node.get_logger().debug(f"Ign: {self.name}")
+                return
+            if self.msg_value is not None and last_active == self.active:
+                # node.get_logger().debug(f"Ign: {self.name}")
+                return
 
         if self.msg_value is not None:
             # This is the case for a static message.
@@ -245,6 +271,7 @@ class JoyTeleopTopicCommand(JoyTeleopCommand):
         if hasattr(msg, 'header'):
             msg.header.stamp = node.get_clock().now().to_msg()
 
+        node.get_logger().debug(f"{msg}")
         self.pub.publish(msg)
 
 
@@ -365,7 +392,7 @@ class JoyTeleop(Node):
         for name, config in self.retrieve_config().items():
             if name in names:
                 raise JoyTeleopException("command '{}' was duplicated".format(name))
-
+            self.get_logger().debug(f"{name}, {config}")
             try:
                 interface_group = config['type']
 

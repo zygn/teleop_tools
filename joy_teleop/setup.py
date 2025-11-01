@@ -15,7 +15,9 @@ setup(
     data_files=[
         (share_path, ['package.xml']),
         (os.path.join(share_path, 'config'), [os.path.join('config', 'joy_teleop_example.yaml')]),
+        (os.path.join(share_path, 'config'), [os.path.join('config', 'f1tenth_stack_joy.yaml')]),
         (os.path.join(share_path, 'launch'), [os.path.join('launch', 'example.launch.py')]),
+        (os.path.join(share_path, 'launch'), [os.path.join('launch', 'f1tenth_stack_joy.launch.py')]),
         (os.path.join('share', 'ament_index', 'resource_index', 'packages'),
          [os.path.join('resource', package_name)]),
     ],
